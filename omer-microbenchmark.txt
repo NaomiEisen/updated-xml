@@ -1,0 +1,51 @@
+    exit 1
+fi
+
+# Init conda
+source /opt/miniconda3/etc/profile.d/conda.sh
+# Create basedir
+basedir="outputs-$(date +%Y%m%d-%H%M%S)"
+mkdir -p $basedir
+
+# Check number of GPU's
+NUM_GPUS=$(nvidia-smi --query-gpu=gpu_name --format=csv,noheader | wc -l)
+echo "Running microbenchmarks..."
+echo "Output Location: $basedir"
+
+# Run microbenchmarks
+for ((i=1; i<=$runs; i++)); do
+out_dir="$basedir/run_$i"
+mkdir -p $out_dir
+
+# All-encompassing tests:
+# cmd="./nvbandwidth/nvbandwidth"
+# echo $cmd >> $out_dir/nvbandwidth.out 2>&1
+# eval $cmd >> $out_dir/nvbandwidth.out 2>&1
+
+# NCCL AllReduce test:
+# --standalone since we are currently testing a single-node setup
+export NCCL_IGNORE_CPU_AFFINITY=1
+conda activate torch
+cmd="torchrun --standalone --nproc_per_node=$NUM_GPUS `pwd`/nccl-tests/all-reduce.py"
+echo $cmd >> $out_dir/nccltest.out 2>&1
+eval $cmd >> $out_dir/nccltest.out 2>&1
+conda deactivate
+
+# Single device BW tests (Device-to-itself memcpy):
+for ((j=0; j<$NUM_GPUS; j++)); do
+cmd="CUDA_VISIBLE_DEVICES=$j ./cuda-samples/Samples/1_Utilities/bandwidthTest/bandwidthTest --memory=pinned >
+echo $cmd  >> $out_dir/bandwidthTest-gpu$j.out 2>&1
+eval $cmd  >> $out_dir/bandwidthTest-gpu$j.out 2>&1 
+done
+wait
+
+# P2P BW tests (Redundant):
+cmd="./cuda-samples/Samples/5_Domain_Specific/p2pBandwidthLatencyTest/p2pBandwidthLatencyTest --p2p_write"
+echo $cmd >> $out_dir/p2pBandwidthLatencyTest-p2p_write.out 2>&1
+eval $cmd >> $out_dir/p2pBandwidthLatencyTest-p2p_write.out 2>&1
+
+cmd="./cuda-samples/Samples/5_Domain_Specific/p2pBandwidthLatencyTest/p2pBandwidthLatencyTest --p2p_read"
+echo $cmd >> $out_dir/p2pBandwidthLatencyTest-p2p_read.out 2>&1
+eval $cmd >> $out_dir/p2pBandwidthLatencyTest-p2p_read.out 2>&1
+
+done
