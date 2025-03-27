@@ -1,3 +1,18 @@
+#!/bin/sh
+
+####   Run Benchmarks   ####
+# Check if argument is provided
+if [ $# -eq 0 ]; then
+    echo "Error: Please provide a number as number of runs."
+    echo "Usage: $0 <number>"
+    exit 1
+fi
+
+# Store the first argument
+runs=$1
+# Validate that input is a positive number
+if ! [[ "$runs" =~ ^[0-9]+$ ]]; then
+    echo "Error: Please enter a valid positive number"
     exit 1
 fi
 
@@ -33,7 +48,7 @@ conda deactivate
 
 # Single device BW tests (Device-to-itself memcpy):
 for ((j=0; j<$NUM_GPUS; j++)); do
-cmd="CUDA_VISIBLE_DEVICES=$j ./cuda-samples/Samples/1_Utilities/bandwidthTest/bandwidthTest --memory=pinned >
+cmd="CUDA_VISIBLE_DEVICES=$j ./cuda-samples/Samples/1_Utilities/bandwidthTest/bandwidthTest --memory=pinned --mode=shmoo"
 echo $cmd  >> $out_dir/bandwidthTest-gpu$j.out 2>&1
 eval $cmd  >> $out_dir/bandwidthTest-gpu$j.out 2>&1 
 done
